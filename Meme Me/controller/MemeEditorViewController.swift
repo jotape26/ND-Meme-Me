@@ -16,7 +16,10 @@ class MemeEditorViewController: UIViewController{
         .foregroundColor: UIColor.white,
         .font: UIFont(name: "HelveticaNeue-CondensedBlack", size: 40)!,
         .strokeWidth: -3.0]
+    let appDelegate = UIApplication.shared.delegate as! AppDelegate
     var keyboardSubscription = false
+    var meme: Meme?
+    var passedMeme = false
     
     // MARK: - IBOutlets and IBActions
 
@@ -35,25 +38,32 @@ class MemeEditorViewController: UIViewController{
         presentPickerViewController(sourceType: .photoLibrary)
     }
     
+    @IBAction func exitButton(_ sender: Any) {
+        self.tabBarController?.tabBar.isHidden = false
+        navigationController?.popViewController(animated: true)
+    }
+    
     @IBAction func shareMeme(_ sender: Any) {
         let newMemeImage = save()
         
-        let shareView = UIActivityViewController(activityItems: [newMemeImage],
+        let shareView = UIActivityViewController(activityItems: [meme!.memeImage],
                                                  applicationActivities: nil)
         
         shareView.completionWithItemsHandler = {(activityType: UIActivity.ActivityType?, completed: Bool, returnedItems: [Any]?, error: Error?) in
-            if !completed {
-                self.presentInformationAlert(alertTitle: "Uh-oh", alertMessage: "Your meme wasn't saved or shared.")
-                return
+            if(!self.passedMeme){
+                if !completed {
+                    self.presentInformationAlert(alertTitle: "Uh-oh", alertMessage: "Your meme wasn't saved or shared.")
+                    return
+                }
+                self.presentInformationAlert(alertTitle: "Meme Saved!",
+                                             alertMessage: "Your new meme is now saved on your Camera Roll")
+                
+                UIImageWriteToSavedPhotosAlbum(newMemeImage,
+                                               self,
+                                               #selector(self.image(_:didFinishSavingWithError:contextInfo:)),
+                                               nil)
+                
             }
-            self.presentInformationAlert(alertTitle: "Meme Saved!",
-                                         alertMessage: "Your new meme is now saved on your Camera Roll")
-            
-            UIImageWriteToSavedPhotosAlbum(newMemeImage,
-                                           self,
-                                           #selector(self.image(_:didFinishSavingWithError:contextInfo:)),
-                                           nil)
-            
         }
         present(shareView, animated: true, completion: nil)
     }
@@ -66,9 +76,11 @@ class MemeEditorViewController: UIViewController{
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        self.tabBarController?.tabBar.isHidden = true
+        btnShare.isEnabled = false
+        checkIfMemeWasPassed()
         configureTextField(txtTop)
         configureTextField(txtBottom)
-        btnShare.isEnabled = false
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -95,8 +107,15 @@ class MemeEditorViewController: UIViewController{
     
     func save() -> UIImage {
         // Create the meme
-        return Meme(topLabel: txtTop.text!, bottomLabel: txtBottom.text!, originalImage: imgPicker
-            .image!, memeImage: generateMemedImage()).memeImage
+        let brandNewMeme = Meme(topLabel: txtTop.text!, bottomLabel: txtBottom.text!, originalImage: imgPicker
+            .image!, memeImage: generateMemedImage())
+        
+        if(!passedMeme){
+            self.appDelegate.memes.append(brandNewMeme)
+        }
+        meme = brandNewMeme
+        
+        return brandNewMeme.memeImage
         
     }
     
@@ -133,6 +152,16 @@ class MemeEditorViewController: UIViewController{
         informationAlert.addAction(UIAlertAction(title: "OK",
                                                  style: .default))
         present(informationAlert, animated: true, completion: nil)
+    }
+    
+    func checkIfMemeWasPassed(){
+        if let meme = meme {
+            passedMeme = true
+            txtTop.isHidden = true
+            txtBottom.isHidden = true
+            imgPicker.image = meme.memeImage
+            btnShare.isEnabled = true
+        }
     }
 }
 
